@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MinimalApi.ToDo
 {
@@ -9,23 +10,27 @@ namespace MinimalApi.ToDo
         {
             app.MapGet("/todos", ToDoRequests.GetAll)
                 .Produces<List<ToDo>>() // () domyślny kod 200
-                .WithTags("To Dos"); // Zmiana nazwy w Swaggerze
+                .WithTags("To Dos") // Zmiana nazwy w Swaggerze
+                .RequireAuthorization();
 
             app.MapGet("/todos/{id}", ToDoRequests.GetById)
                 .Produces<ToDo>()
                 .Produces(StatusCodes.Status404NotFound)
-                .WithTags("To Dos");
+                .WithTags("To Dos")
+                .AllowAnonymous();
 
             app.MapPost("/todos", ToDoRequests.Create)
                 .Produces<ToDo>(StatusCodes.Status201Created)
                 .Accepts<ToDo>("application/json")
-                .WithTags("To Dos");
+                .WithTags("To Dos")
+                .WithValidator<ToDo>();
 
             app.MapPut("/todos/{id}", ToDoRequests.Update)
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces(StatusCodes.Status404NotFound)
                 .Accepts<ToDo>("application/json")
-                .WithTags("To Dos");
+                .WithTags("To Dos")
+                .WithValidator<ToDo>();
 
             app.MapDelete("/todos/{id}", ToDoRequests.Delete)
                 .Produces(StatusCodes.Status204NoContent)
@@ -42,6 +47,7 @@ namespace MinimalApi.ToDo
             return Results.Ok(todos);
         }
 
+        [AllowAnonymous]
         public static IResult GetById(IToDoService service, Guid id)
         {
             var todo = service.GetById(id);
@@ -53,25 +59,15 @@ namespace MinimalApi.ToDo
             return Results.Ok(todo);
         }
 
-        public static IResult Create(IToDoService service, ToDo toDo, IValidator<ToDo> validator)
+        [Authorize]
+        public static IResult Create(IToDoService service, ToDo toDo)
         {
-            var validationResult = validator.Validate(toDo);
-            if(!validationResult.IsValid)
-            {
-                return Results.BadRequest(validationResult.Errors);
-            }
             service.Create(toDo);
             return Results.Created($"/todos/{toDo.Id}", toDo);
         }
 
-        public static IResult Update(IToDoService service, Guid id, ToDo toDo, IValidator<ToDo> validator)
+        public static IResult Update(IToDoService service, Guid id, ToDo toDo)
         {
-            var validationResult = validator.Validate(toDo);
-            if (!validationResult.IsValid)
-            {
-                return Results.BadRequest(validationResult.Errors);
-            }
-
             var todo = service.GetById(id);
             if (todo is null)
             {
